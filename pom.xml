@@ -80,6 +80,7 @@
 
 	<!-- Chạy local: ./mvnw spring-boot:run  (prefix đúng là spring-boot, không phải springboot) -->
 	<build>
+		<finalName>schoolmanager</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
