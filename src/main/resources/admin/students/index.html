@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/layout :: layoutPage(pageTitle='Quản lý sinh viên', content=~{:: content})}">
+<body>
+<th:block th:fragment="content">
+  <div class="container-fluid" id="studentAdminRoot"
+       th:attr="data-api-base=@{/api/students}">
+
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a th:href="@{/admin}">Trang quản trị</a></li>
+        <li class="breadcrumb-item active">Sinh viên</li>
+      </ol>
+    </nav>
+
+    <div id="toastArea" class="position-fixed top-0 end-0 p-3 mt-5" style="z-index: 1080;"></div>
+
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <h5 class="mb-0 fw-semibold">
+          <i class="bi bi-people-fill me-2 text-primary"></i>Danh sách sinh viên
+        </h5>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <a th:href="@{/swagger-ui/index.html}" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">
+            <i class="bi bi-braces me-1"></i> Swagger API
+          </a>
+          <button type="button" class="btn btn-primary btn-sm" id="btnOpenCreate">
+            <i class="bi bi-plus-lg me-1"></i> Thêm mới
+          </button>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="row g-2 align-items-end mb-3 flex-wrap">
+          <div class="col-12 col-md-3 col-lg-3">
+            <label class="form-label small text-muted mb-0">Tìm kiếm</label>
+            <input type="text" id="fKeyword" class="form-control form-control-sm" placeholder="MSSV, tên, email..."/>
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small text-muted mb-0">Số dòng / trang</label>
+            <select id="fSize" class="form-select form-select-sm">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small text-muted mb-0">Sắp xếp theo</label>
+            <select id="fSortBy" class="form-select form-select-sm">
+              <option value="studentCode" selected>MSSV</option>
+              <option value="fullName">Họ tên</option>
+              <option value="createdAt">Ngày tạo</option>
+              <option value="updatedAt">Ngày sửa</option>
+              <option value="cohortYear">Khóa</option>
+              <option value="email">Email</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small text-muted mb-0">Chiều</label>
+            <select id="fSortDir" class="form-select form-select-sm">
+              <option value="asc" selected>Tăng</option>
+              <option value="desc">Giảm</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <button type="button" class="btn btn-primary btn-sm" id="btnSearch">
+              <i class="bi bi-search me-1"></i> Lọc
+            </button>
+          </div>
+          <div class="col-auto">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnReset">
+              <i class="bi bi-arrow-counterclockwise me-1"></i> Làm mới
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover table-bordered align-middle mb-0 small">
+            <thead class="table-primary">
+              <tr>
+                <th class="text-center" style="width:44px;">Ảnh</th>
+                <th class="text-center" style="width:48px;">#</th>
+                <th>MSSV</th>
+                <th>Họ và tên</th>
+                <th>Giới tính</th>
+                <th>Lớp</th>
+                <th>Ngành</th>
+                <th>Khóa</th>
+                <th>Liên hệ</th>
+                <th class="text-center" style="width:110px;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="tblBody">
+              <tr><td colspan="10" class="text-center text-muted py-4">Đang tải…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2 d-none" id="pagerWrap">
+          <small class="text-muted" id="pagerInfo"></small>
+          <nav id="pagerNav"></nav>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal form -->
+    <div class="modal fade" id="studentModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="studentModalTitle">Sinh viên</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div id="formGlobalError" class="alert alert-danger py-2 small d-none"></div>
+            <form id="studentForm" class="row g-3" novalidate>
+              <input type="hidden" id="fId"/>
+              <div class="col-md-6" id="wrapMssv">
+                <label class="form-label fw-semibold">Mã sinh viên (MSSV)</label>
+                <div id="mssvAutoHint" class="alert alert-light border small py-2 mb-0 d-none">
+                  Hệ thống cấp mã tự động: <strong>SV001</strong>, <strong>SV002</strong>, <strong>SV003</strong>, … khi bạn nhấn <em>Lưu</em>.
+                </div>
+                <input type="text" id="fStudentCode" class="form-control" maxlength="16" readonly autocomplete="off"/>
+                <div class="invalid-feedback" data-err-for="studentCode"></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Họ và tên <span class="text-danger">*</span></label>
+                <input type="text" id="fFullName" class="form-control" maxlength="150" required/>
+                <div class="invalid-feedback" data-err-for="fullName"></div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Giới tính <span class="text-danger">*</span></label>
+                <select id="fGender" class="form-select" required>
+                  <option value="">— Chọn —</option>
+                  <option value="MALE">Nam</option>
+                  <option value="FEMALE">Nữ</option>
+                  <option value="OTHER">Khác</option>
+                </select>
+                <div class="invalid-feedback" data-err-for="gender"></div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Ngày sinh <span class="text-danger">*</span></label>
+                <input type="date" id="fDateOfBirth" class="form-control" required/>
+                <div class="invalid-feedback" data-err-for="dateOfBirth"></div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">Khóa (năm nhập học) <span class="text-danger">*</span></label>
+                <input type="number" id="fCohortYear" class="form-control" min="1990" max="2100" required placeholder="VD: 2023"/>
+                <div class="invalid-feedback" data-err-for="cohortYear"></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Số điện thoại</label>
+                <input type="text" id="fPhone" class="form-control" maxlength="20"/>
+                <div class="invalid-feedback" data-err-for="phone"></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Email</label>
+                <input type="text" id="fEmail" class="form-control" maxlength="150" inputmode="email" autocomplete="email" placeholder="sv@truong.edu.vn"/>
+                <div class="invalid-feedback" data-err-for="email"></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Mã lớp</label>
+                <input type="text" id="fClassCode" class="form-control" maxlength="50"/>
+                <div class="invalid-feedback" data-err-for="classCode"></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Ngành</label>
+                <input type="text" id="fMajor" class="form-control" maxlength="150"/>
+                <div class="invalid-feedback" data-err-for="major"></div>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Địa chỉ thường trú</label>
+                <textarea id="fPermanentAddress" class="form-control" rows="2" maxlength="500"></textarea>
+                <div class="invalid-feedback" data-err-for="permanentAddress"></div>
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold">Ảnh đại diện</label>
+                <input type="file" id="fAvatar" class="form-control" accept="image/jpeg,image/png,image/webp"/>
+                <div class="form-text">JPG, PNG, WEBP — tối đa 2MB. Để trống khi sửa nếu giữ ảnh cũ.</div>
+                <div id="avatarPreviewWrap" class="mt-2 d-none">
+                  <span class="small text-muted me-2">Ảnh hiện tại:</span>
+                  <img id="avatarPreview" src="" alt="" class="rounded border" style="max-height:72px;"/>
+                </div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Đóng</button>
+            <button type="button" class="btn btn-primary" id="btnSaveStudent">
+              <i class="bi bi-save me-1"></i> Lưu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const root = document.getElementById('studentAdminRoot');
+      if (!root) return;
+      const API = root.getAttribute('data-api-base') || '/api/students';
+
+      const state = { page: 0, keyword: '', size: 10, sortBy: 'studentCode', sortDir: 'asc' };
+
+      const genderLabel = { MALE: 'Nam', FEMALE: 'Nữ', OTHER: 'Khác' };
+
+      const els = {
+        tblBody: document.getElementById('tblBody'),
+        pagerWrap: document.getElementById('pagerWrap'),
+        pagerInfo: document.getElementById('pagerInfo'),
+        pagerNav: document.getElementById('pagerNav'),
+        fKeyword: document.getElementById('fKeyword'),
+        fSize: document.getElementById('fSize'),
+        fSortBy: document.getElementById('fSortBy'),
+        fSortDir: document.getElementById('fSortDir'),
+        btnSearch: document.getElementById('btnSearch'),
+        btnReset: document.getElementById('btnReset'),
+        btnOpenCreate: document.getElementById('btnOpenCreate'),
+        modalEl: document.getElementById('studentModal'),
+        modalTitle: document.getElementById('studentModalTitle'),
+        form: document.getElementById('studentForm'),
+        formGlobalError: document.getElementById('formGlobalError'),
+        fId: document.getElementById('fId'),
+        fStudentCode: document.getElementById('fStudentCode'),
+        fFullName: document.getElementById('fFullName'),
+        fGender: document.getElementById('fGender'),
+        fDateOfBirth: document.getElementById('fDateOfBirth'),
+        fCohortYear: document.getElementById('fCohortYear'),
+        fPhone: document.getElementById('fPhone'),
+        fEmail: document.getElementById('fEmail'),
+        fClassCode: document.getElementById('fClassCode'),
+        fMajor: document.getElementById('fMajor'),
+        fPermanentAddress: document.getElementById('fPermanentAddress'),
+        fAvatar: document.getElementById('fAvatar'),
+        avatarPreviewWrap: document.getElementById('avatarPreviewWrap'),
+        avatarPreview: document.getElementById('avatarPreview'),
+        btnSaveStudent: document.getElementById('btnSaveStudent'),
+        toastArea: document.getElementById('toastArea'),
+        mssvAutoHint: document.getElementById('mssvAutoHint')
+      };
+
+      const modal = new bootstrap.Modal(els.modalEl);
+
+      function showToast(message, variant) {
+        const id = 't' + Date.now();
+        const bg = variant === 'success' ? 'text-bg-success' : variant === 'danger' ? 'text-bg-danger' : 'text-bg-secondary';
+        const html = '<div id="' + id + '" class="toast align-items-center ' + bg + ' border-0" role="alert">' +
+            '<div class="d-flex"><div class="toast-body">' + escapeHtml(message) + '</div>' +
+            '<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>';
+        els.toastArea.insertAdjacentHTML('beforeend', html);
+        const t = document.getElementById(id);
+        const toast = new bootstrap.Toast(t, { delay: 4000 });
+        toast.show();
+        t.addEventListener('hidden.bs.toast', () => t.remove());
+      }
+
+      function escapeHtml(s) {
+        if (!s) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      /** Chuẩn hóa LocalDate từ API (chuỗi ISO hoặc mảng Jackson) cho input type=date */
+      function normalizeDateInput(v) {
+        if (v == null || v === '') return '';
+        if (typeof v === 'string') {
+          return v.length >= 10 ? v.substring(0, 10) : '';
+        }
+        if (Array.isArray(v) && v.length >= 3) {
+          const y = v[0], m = String(v[1]).padStart(2, '0'), d = String(v[2]).padStart(2, '0');
+          return y + '-' + m + '-' + d;
+        }
+        return '';
+      }
+
+      function buildListUrl() {
+        const p = new URLSearchParams();
+        p.set('page', String(state.page));
+        p.set('size', String(state.size));
+        p.set('sortBy', state.sortBy);
+        p.set('sortDir', state.sortDir);
+        if (state.keyword) p.set('keyword', state.keyword);
+        return API + '?' + p.toString();
+      }
+
+      async function loadList() {
+        els.tblBody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">Đang tải…</td></tr>';
+        try {
+          const res = await fetch(buildListUrl(), { headers: { 'Accept': 'application/json' } });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          renderTable(data);
+          renderPager(data);
+        } catch (e) {
+          els.tblBody.innerHTML = '<tr><td colspan="10" class="text-center text-danger py-4">Không tải được dữ liệu.</td></tr>';
+          els.pagerWrap.classList.add('d-none');
+          showToast('Lỗi tải danh sách', 'danger');
+        }
+      }
+
+      function renderTable(page) {
+        const rows = page.content || [];
+        if (!rows.length) {
+          els.tblBody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Chưa có dữ liệu.</td></tr>';
+          return;
+        }
+        let html = '';
+        rows.forEach((s, idx) => {
+          const num = page.page * page.size + idx + 1;
+          const av = s.avatarPath
+              ? '<img src="' + escapeHtml(s.avatarPath) + '" class="rounded-circle border" style="width:36px;height:36px;object-fit:cover;" alt=""/>'
+              : '<span class="text-muted"><i class="bi bi-person-circle fs-4"></i></span>';
+          const g = s.gender ? (genderLabel[s.gender] || s.gender) : '-';
+          const phone = s.phone || '';
+          const email = s.email || '';
+          html += '<tr>' +
+              '<td class="text-center">' + av + '</td>' +
+              '<td class="text-center text-muted">' + num + '</td>' +
+              '<td class="fw-semibold">' + escapeHtml(s.studentCode || '-') + '</td>' +
+              '<td>' + escapeHtml(s.fullName || '') + '</td>' +
+              '<td>' + escapeHtml(g) + '</td>' +
+              '<td>' + escapeHtml(s.classCode || '-') + '</td>' +
+              '<td class="text-muted">' + escapeHtml(s.major || '-') + '</td>' +
+              '<td class="text-center">' + (s.cohortYear != null ? s.cohortYear : '-') + '</td>' +
+              '<td class="text-muted"><div class="text-nowrap">' + escapeHtml(phone) + '</div>' +
+              '<div class="text-truncate" style="max-width:180px;" title="' + escapeHtml(email) + '">' + escapeHtml(email) + '</div></td>' +
+              '<td class="text-center">' +
+              '<button type="button" class="btn btn-sm btn-outline-primary me-1 btn-edit" data-id="' + s.id + '" title="Sửa"><i class="bi bi-pencil"></i></button>' +
+              '<button type="button" class="btn btn-sm btn-outline-danger btn-del" data-id="' + s.id + '" title="Xóa mềm"><i class="bi bi-trash"></i></button>' +
+              '</td></tr>';
+        });
+        els.tblBody.innerHTML = html;
+        els.tblBody.querySelectorAll('.btn-edit').forEach(b => b.addEventListener('click', () => openEdit(b.getAttribute('data-id'))));
+        els.tblBody.querySelectorAll('.btn-del').forEach(b => b.addEventListener('click', () => confirmDelete(b.getAttribute('data-id'))));
+      }
+
+      function renderPager(page) {
+        const total = page.totalElements || 0;
+        if (total === 0) {
+          els.pagerWrap.classList.add('d-none');
+          return;
+        }
+        els.pagerWrap.classList.remove('d-none');
+        els.pagerInfo.innerHTML = 'Tổng <strong>' + total + '</strong> bản ghi | Trang <strong>' + (page.page + 1) + '</strong> / <strong>' + page.totalPages + '</strong>';
+
+        let nav = '<ul class="pagination pagination-sm mb-0 flex-wrap">';
+        const cur = page.page;
+        const last = page.totalPages - 1;
+        nav += '<li class="page-item' + (page.first ? ' disabled' : '') + '"><a class="page-link page-prev" href="#" aria-label="Trước"><i class="bi bi-chevron-left"></i></a></li>';
+        for (let i = 0; i < page.totalPages; i++) {
+          nav += '<li class="page-item' + (i === cur ? ' active' : '') + '"><a class="page-link page-num" data-page="' + i + '" href="#">' + (i + 1) + '</a></li>';
+        }
+        nav += '<li class="page-item' + (page.last ? ' disabled' : '') + '"><a class="page-link page-next" href="#" aria-label="Sau"><i class="bi bi-chevron-right"></i></a></li></ul>';
+        els.pagerNav.innerHTML = nav;
+        els.pagerNav.querySelector('.page-prev')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (!page.first) { state.page = cur - 1; loadList(); }
+        });
+        els.pagerNav.querySelector('.page-next')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (!page.last) { state.page = cur + 1; loadList(); }
+        });
+        els.pagerNav.querySelectorAll('.page-num').forEach(a => {
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            state.page = parseInt(a.getAttribute('data-page'), 10);
+            loadList();
+          });
+        });
+      }
+
+      function readFiltersFromUi() {
+        state.keyword = (els.fKeyword.value || '').trim();
+        state.size = parseInt(els.fSize.value, 10) || 10;
+        state.sortBy = els.fSortBy.value;
+        state.sortDir = els.fSortDir.value;
+      }
+
+      function clearFieldErrors() {
+        els.form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+        els.form.querySelectorAll('[data-err-for]').forEach(el => { el.textContent = ''; });
+        els.formGlobalError.classList.add('d-none');
+        els.formGlobalError.textContent = '';
+      }
+
+      function applyFieldErrors(errors) {
+        if (!errors) return;
+        Object.keys(errors).forEach(field => {
+          const map = {
+            studentCode: els.fStudentCode, fullName: els.fFullName, gender: els.fGender,
+            dateOfBirth: els.fDateOfBirth, phone: els.fPhone, email: els.fEmail,
+            classCode: els.fClassCode, major: els.fMajor, cohortYear: els.fCohortYear,
+            permanentAddress: els.fPermanentAddress
+          };
+          const input = map[field];
+          if (input) {
+            input.classList.add('is-invalid');
+            const hint = els.form.querySelector('[data-err-for="' + field + '"]');
+            if (hint) hint.textContent = errors[field];
+          }
+        });
+      }
+
+      async function parseError(res) {
+        const ct = (res.headers.get('Content-Type') || '').toLowerCase();
+        const isJson = ct.includes('application/json') || ct.includes('application/problem+json');
+        if (isJson) {
+          try {
+            const j = await res.json();
+            const fieldErrors = j.errors || (j.properties && j.properties.errors) || null;
+            if (fieldErrors) return { fieldErrors: fieldErrors, detail: j.detail || j.title || 'Dữ liệu không hợp lệ' };
+            if (j.detail) return { detail: j.detail, field: j.field };
+            if (j.title) return { detail: j.title };
+          } catch (_) { /* ignore */ }
+        }
+        return { detail: 'Lỗi ' + res.status };
+      }
+
+      function openCreate() {
+        clearFieldErrors();
+        els.modalTitle.textContent = 'Thêm sinh viên';
+        els.fId.value = '';
+        els.mssvAutoHint.classList.remove('d-none');
+        els.fStudentCode.classList.add('d-none');
+        els.fStudentCode.value = '';
+        els.fFullName.value = '';
+        els.fGender.value = '';
+        els.fDateOfBirth.value = '';
+        els.fCohortYear.value = '';
+        els.fPhone.value = '';
+        els.fEmail.value = '';
+        els.fClassCode.value = '';
+        els.fMajor.value = '';
+        els.fPermanentAddress.value = '';
+        els.fAvatar.value = '';
+        els.avatarPreviewWrap.classList.add('d-none');
+        modal.show();
+      }
+
+      async function openEdit(id) {
+        clearFieldErrors();
+        els.modalTitle.textContent = 'Cập nhật sinh viên';
+        els.mssvAutoHint.classList.add('d-none');
+        els.fStudentCode.classList.remove('d-none');
+        try {
+          const res = await fetch(API + '/' + encodeURIComponent(id), { headers: { 'Accept': 'application/json' } });
+          if (res.status === 404) {
+            showToast('Không tìm thấy sinh viên', 'danger');
+            return;
+          }
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const s = await res.json();
+          els.fId.value = s.id || '';
+          els.fStudentCode.value = s.studentCode || '';
+          els.fStudentCode.setAttribute('readonly', 'readonly');
+          els.fStudentCode.classList.remove('is-invalid');
+          els.fFullName.value = s.fullName || '';
+          els.fGender.value = s.gender || '';
+          els.fDateOfBirth.value = normalizeDateInput(s.dateOfBirth);
+          els.fCohortYear.value = s.cohortYear != null ? String(s.cohortYear) : '';
+          els.fPhone.value = s.phone || '';
+          els.fEmail.value = s.email || '';
+          els.fClassCode.value = s.classCode || '';
+          els.fMajor.value = s.major || '';
+          els.fPermanentAddress.value = s.permanentAddress || '';
+          els.fAvatar.value = '';
+          if (s.avatarPath) {
+            els.avatarPreview.src = s.avatarPath;
+            els.avatarPreviewWrap.classList.remove('d-none');
+          } else {
+            els.avatarPreviewWrap.classList.add('d-none');
+          }
+          modal.show();
+        } catch (e) {
+          showToast('Không tải được chi tiết', 'danger');
+        }
+      }
+
+      function buildPayloadFromForm() {
+        const id = els.fId.value || null;
+        const cohort = els.fCohortYear.value.trim();
+        const cohortYear = cohort === '' ? null : parseInt(cohort, 10);
+        const base = {
+          fullName: els.fFullName.value.trim(),
+          gender: els.fGender.value || null,
+          dateOfBirth: els.fDateOfBirth.value || null,
+          cohortYear: cohortYear,
+          phone: els.fPhone.value.trim() || null,
+          email: els.fEmail.value.trim() || null,
+          classCode: els.fClassCode.value.trim() || null,
+          major: els.fMajor.value.trim() || null,
+          permanentAddress: els.fPermanentAddress.value.trim() || null,
+          avatarPath: null
+        };
+        if (id) {
+          base.id = id;
+          base.studentCode = els.fStudentCode.value.trim();
+        }
+        return base;
+      }
+
+      async function saveStudent() {
+        clearFieldErrors();
+        const id = els.fId.value;
+        const file = els.fAvatar.files && els.fAvatar.files[0];
+        const payload = buildPayloadFromForm();
+        const isEdit = !!id;
+
+        if (!payload.fullName || !payload.gender || !payload.dateOfBirth) {
+          if (!payload.fullName) els.fFullName.classList.add('is-invalid');
+          if (!payload.gender) els.fGender.classList.add('is-invalid');
+          if (!payload.dateOfBirth) els.fDateOfBirth.classList.add('is-invalid');
+          els.formGlobalError.textContent = 'Vui lòng điền họ tên, giới tính và ngày sinh.';
+          els.formGlobalError.classList.remove('d-none');
+          return;
+        }
+        if (payload.cohortYear == null || !Number.isInteger(payload.cohortYear)) {
+          els.fCohortYear.classList.add('is-invalid');
+          els.formGlobalError.textContent = 'Vui lòng nhập khóa (năm nhập học), ví dụ 2023.';
+          els.formGlobalError.classList.remove('d-none');
+          return;
+        }
+        if (payload.cohortYear < 1990 || payload.cohortYear > 2100) {
+          els.fCohortYear.classList.add('is-invalid');
+          els.formGlobalError.textContent = 'Khóa phải trong khoảng 1990–2100.';
+          els.formGlobalError.classList.remove('d-none');
+          return;
+        }
+        if (payload.phone && !/^0[0-9]{9,10}$/.test(payload.phone)) {
+          els.fPhone.classList.add('is-invalid');
+          els.formGlobalError.textContent = 'Số điện thoại phải 10–11 số và bắt đầu bằng 0.';
+          els.formGlobalError.classList.remove('d-none');
+          return;
+        }
+        if (payload.email && !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(payload.email)) {
+          els.fEmail.classList.add('is-invalid');
+          els.formGlobalError.textContent = 'Email không đúng định dạng.';
+          els.formGlobalError.classList.remove('d-none');
+          return;
+        }
+
+        const fetchOpts = { headers: { 'Accept': 'application/json' } };
+
+        try {
+          let res;
+          if (file) {
+            const fd = new FormData();
+            fd.append('student', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+            fd.append('avatar', file, file.name);
+            const url = isEdit ? API + '/' + encodeURIComponent(id) : API;
+            res = await fetch(url, Object.assign({}, fetchOpts, { method: isEdit ? 'PUT' : 'POST', body: fd }));
+          } else {
+            const url = isEdit ? API + '/' + encodeURIComponent(id) : API;
+            res = await fetch(url, Object.assign({}, fetchOpts, {
+              method: isEdit ? 'PUT' : 'POST',
+              headers: Object.assign({}, fetchOpts.headers, { 'Content-Type': 'application/json' }),
+              body: JSON.stringify(payload)
+            }));
+          }
+
+          if (res.ok) {
+            modal.hide();
+            showToast(isEdit ? 'Đã cập nhật sinh viên.' : 'Đã thêm sinh viên.', 'success');
+            state.page = 0;
+            readFiltersFromUi();
+            await loadList();
+            return;
+          }
+
+          const err = await parseError(res);
+          if (err.fieldErrors) {
+            applyFieldErrors(err.fieldErrors);
+            els.formGlobalError.textContent = err.detail || 'Vui lòng kiểm tra các trường.';
+            els.formGlobalError.classList.remove('d-none');
+            return;
+          }
+          if (res.status === 409 && err.detail) {
+            els.formGlobalError.textContent = err.field ? ('[' + err.field + '] ' + err.detail) : err.detail;
+            els.formGlobalError.classList.remove('d-none');
+            return;
+          }
+          els.formGlobalError.textContent = err.detail || 'Không lưu được.';
+          els.formGlobalError.classList.remove('d-none');
+        } catch (e) {
+          showToast('Lỗi mạng hoặc máy chủ.', 'danger');
+        }
+      }
+
+      async function confirmDelete(id) {
+        if (!confirm('Xóa mềm sinh viên này?')) return;
+        try {
+          const res = await fetch(API + '/' + encodeURIComponent(id), {
+            method: 'DELETE',
+            headers: { 'Accept': 'application/json' }
+          });
+          if (res.status === 204) {
+            showToast('Đã xóa mềm sinh viên.', 'success');
+            await loadList();
+          } else if (res.status === 404) {
+            showToast('Không tìm thấy bản ghi.', 'danger');
+          } else {
+            showToast('Không xóa được.', 'danger');
+          }
+        } catch (e) {
+          showToast('Lỗi khi xóa.', 'danger');
+        }
+      }
+
+      els.btnSearch.addEventListener('click', () => {
+        readFiltersFromUi();
+        state.page = 0;
+        loadList();
+      });
+      els.btnReset.addEventListener('click', () => {
+        els.fKeyword.value = '';
+        els.fSize.value = '10';
+        els.fSortBy.value = 'studentCode';
+        els.fSortDir.value = 'asc';
+        state.page = 0;
+        state.keyword = '';
+        state.size = 10;
+        state.sortBy = 'studentCode';
+        state.sortDir = 'asc';
+        loadList();
+      });
+      els.btnOpenCreate.addEventListener('click', openCreate);
+      els.btnSaveStudent.addEventListener('click', saveStudent);
+
+      els.fKeyword.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); els.btnSearch.click(); }
+      });
+
+      readFiltersFromUi();
+      loadList();
+    })();
+  </script>
+</th:block>
+</body>
+</html>
