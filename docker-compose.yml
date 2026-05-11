@@ -1,0 +1,52 @@
+# Stack: SQL Server + Spring Boot + Nginx (reverse proxy cổng 80 -> app:8080)
+#
+# Chuẩn bị:
+#   cp .env.example .env
+#   # sửa MSSQL_SA_PASSWORD trong .env (đủ mạnh theo yêu cầu Microsoft)
+#
+# Lần đầu: tạo database QLSV (xem README), rồi:
+#   docker compose up -d --build
+#
+# Truy cập: http://localhost/
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Đặt MSSQL_SA_PASSWORD trong file .env}
+    # Host 14333 tránh trùng SQL Server cài trên máy (thường dùng 1433). Trong mạng Compose app vẫn dùng sqlserver:1433.
+    ports:
+      - "14333:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+
+  app:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:sqlserver://sqlserver:1433;databaseName=QLSV;encrypt=true;trustServerCertificate=true
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ${MSSQL_SA_PASSWORD}
+      APP_UPLOAD_BASE_DIR: /data/uploads
+    volumes:
+      - app-uploads:/data/uploads
+    expose:
+      - "8080"
+    restart: on-failure
+    depends_on:
+      - sqlserver
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+volumes:
+  sqlserver-data:
+  app-uploads:
