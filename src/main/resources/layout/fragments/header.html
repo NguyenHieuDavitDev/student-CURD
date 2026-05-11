@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title th:text="${title} + ' – Quản lý lịch học'">Hệ thống</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet"/>
+  <style>
+    /* ===== CSS VARIABLES ===== */
+    :root {
+      --sidebar-width: 240px;
+      --sidebar-collapsed-width: 64px;
+      --header-height: 56px;
+      --sidebar-bg: #fff;
+      --sidebar-active-bg: rgba(37, 99, 235, 0.1);
+      --sidebar-active-color: #1d4ed8;
+      --sidebar-hover-bg: rgba(0, 0, 0, 0.04);
+      --transition: 0.25s ease;
+    }
+
+    /* ===== RESET ===== */
+    body {
+      min-height: 100vh;
+      background: #f1f5f9;
+      overflow-x: hidden;
+    }
+
+    /* ===== HEADER ===== */
+    .app-header {
+      height: var(--header-height);
+      background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+      box-shadow: 0 2px 12px rgba(0,0,0,.2);
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1030;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+    }
+    .app-header .brand {
+      color: #fff;
+      font-weight: 700;
+      font-size: 1rem;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      max-width: 200px;
+      transition: max-width var(--transition), opacity var(--transition);
+    }
+    .app-header .brand-text {
+      transition: opacity var(--transition), max-width var(--transition);
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .btn-toggle-sidebar {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.85);
+      font-size: 1.2rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .2s, color .2s;
+      flex-shrink: 0;
+    }
+    .btn-toggle-sidebar:hover { background: rgba(255,255,255,.15); color: #fff; }
+
+    /* ===== SIDEBAR ===== */
+    .app-sidebar {
+      position: fixed;
+      top: var(--header-height);
+      left: 0;
+      bottom: 0;
+      width: var(--sidebar-width);
+      background: var(--sidebar-bg);
+      border-right: 1px solid #e2e8f0;
+      box-shadow: 2px 0 8px rgba(0,0,0,.05);
+      overflow: hidden;
+      transition: width var(--transition);
+      z-index: 1020;
+      display: flex;
+      flex-direction: column;
+    }
+    .app-sidebar.collapsed {
+      width: var(--sidebar-collapsed-width);
+    }
+
+    /* Sidebar section label */
+    .sidebar-label {
+      font-size: .65rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      padding: 12px 16px 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      transition: opacity var(--transition);
+    }
+    .app-sidebar.collapsed .sidebar-label { opacity: 0; }
+
+    /* Sidebar nav item */
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      margin: 2px 8px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #64748b;
+      font-size: .875rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      transition: background var(--transition), color var(--transition);
+      position: relative;
+    }
+    .sidebar-link .nav-icon {
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      width: 20px;
+      text-align: center;
+    }
+    .sidebar-link .nav-text {
+      opacity: 1;
+      transition: opacity var(--transition), max-width var(--transition);
+      max-width: 160px;
+      overflow: hidden;
+    }
+    .app-sidebar.collapsed .sidebar-link .nav-text {
+      opacity: 0;
+      max-width: 0;
+    }
+    .sidebar-link:hover {
+      background: var(--sidebar-hover-bg);
+      color: #1e293b;
+    }
+    .sidebar-link.active {
+      background: var(--sidebar-active-bg);
+      color: var(--sidebar-active-color);
+      font-weight: 600;
+    }
+    .sidebar-link.active .nav-icon { color: var(--sidebar-active-color); }
+
+    /* Tooltip when collapsed */
+    .app-sidebar.collapsed .sidebar-link::after {
+      content: attr(data-label);
+      position: absolute;
+      left: calc(var(--sidebar-collapsed-width) + 8px);
+      background: #1e293b;
+      color: #fff;
+      font-size: .8rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s;
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,.2);
+    }
+    .app-sidebar.collapsed .sidebar-link:hover::after { opacity: 1; }
+
+    /* ===== MAIN CONTENT ===== */
+    .app-main {
+      margin-left: var(--sidebar-width);
+      margin-top: var(--header-height);
+      min-height: calc(100vh - var(--header-height));
+      display: flex;
+      flex-direction: column;
+      transition: margin-left var(--transition);
+    }
+    .app-main.sidebar-collapsed {
+      margin-left: var(--sidebar-collapsed-width);
+    }
+
+    /* ===== SCROLLBAR sidebar ===== */
+    .app-sidebar::-webkit-scrollbar { width: 4px; }
+    .app-sidebar::-webkit-scrollbar-track { background: transparent; }
+    .app-sidebar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+<header class="app-header" th:fragment="header">
+  <!-- Toggle button -->
+  <button class="btn-toggle-sidebar me-3" id="sidebarToggle" title="Thu gọn / Mở rộng menu">
+    <i class="bi bi-list"></i>
+  </button>
+  <!-- Brand -->
+  <a class="brand" th:href="@{/admin}">
+    <i class="bi bi-calendar3 flex-shrink-0"></i>
+    <span class="brand-text">Quản lý lịch học</span>
+  </a>
+  <!-- Right actions -->
+  <div class="ms-auto d-flex align-items-center gap-2">
+    <a th:href="@{/}" class="btn btn-sm btn-outline-light">
+      <i class="bi bi-globe2 me-1"></i>
+      <span class="d-none d-md-inline">Trang người dùng</span>
+    </a>
+    <span class="text-white-50 d-none d-md-inline">|</span>
+    <span class="text-white-50 small d-none d-md-inline">
+      <i class="bi bi-person-circle me-1"></i> Admin
+    </span>
+  </div>
+</header>
+
+</body>
+</html>
